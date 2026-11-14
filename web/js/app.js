@@ -1,3 +1,5 @@
+// Linux: textos do sistema (a versão Linux fica em português)
+const LINUX = /Linux/.test(navigator.userAgent);
 // Piphin Rede · tela. Mostra a conexão, o Wi-Fi (sinal, frequências e canais), o uso ao vivo, os aparelhos da rede,
 // testes de ping, DNS e velocidade, e explica em linguagem simples o que pode estar deixando a rede lenta.
 "use strict";
@@ -137,7 +139,7 @@ function home() {
     </div>`;
 }
 const lastLive = () => S.live[S.live.length - 1] || { rx: 0, tx: 0 };
-const ACTIONS = { wifi: ["Abrir Wi-Fi do Windows", "settings:wifi"], "wifi-tab": ["Ver canais", "tab:wifi"], usage: ["Ver o uso", "tab:usage"], update: ["Abrir configurações", "settings:update"],
+const ACTIONS = { wifi: [LINUX ? "Abrir configurações de Wi-Fi" : "Abrir Wi-Fi do Windows", "settings:wifi"], "wifi-tab": ["Ver canais", "tab:wifi"], usage: ["Ver o uso", "tab:usage"], update: ["Abrir configurações", "settings:update"],
   network: ["Configurações de rede", "settings:network"], renew: ["Renovar o IP", "renew"] };
 function findCard(f) {
   const icon = { alto: "circle-alert", "médio": "triangle-alert", baixo: "info" }[f.level] || "info";
@@ -174,7 +176,7 @@ function wifiTab() {
   const head = `<div class="row"><div class="grow"><h1 class="t">Wi-Fi</h1><p class="sub">Sinal, frequências e canais da sua rede e das redes vizinhas.</p></div>
     <button class="btn" data-act="rescan" ${S.scanning ? "disabled" : ""}>${S.scanning ? `<span class="spin"></span>Procurando redes...` : `<i class="i i-refresh-cw"></i>Procurar de novo`}</button></div>`;
   if (!sc) return head + loading("Procurando as redes Wi-Fi por perto (uns 5 segundos)...");
-  const blocked = sc.blocked ? `<div class="banner"><i class="i i-map-pin"></i><div class="grow">O Windows só mostra as redes por perto com a Localização ligada. Ative "Localização" e "Permitir que aplicativos da área de trabalho acessem sua localização".</div>
+  const blocked = sc.blocked ? `<div class="banner"><i class="i i-map-pin"></i><div class="grow">${LINUX ? "O NetworkManager não listou as redes por perto. Confira se o Wi-Fi está ligado e tente de novo." : `O Windows só mostra as redes por perto com a Localização ligada. Ative "Localização" e "Permitir que aplicativos da área de trabalho acessem sua localização".`}</div>
     <button class="btn sm" data-act="settings:location">Abrir Localização</button></div>` : "";
   const bandsAvail = Object.keys(sc.bands || {});
   const b = sc.bands[S.scanBand];
@@ -267,7 +269,7 @@ function usage() {
       <canvas class="chart" id="liveChart"></canvas></div>
     ${up}
     <div class="card"><h3 class="h"><i class="i i-app-window"></i>Programas conectados</h3>
-      <p class="faint" style="margin:-4px 0 10px">O Windows só mostra quanto cada programa baixa com permissão de administrador. Aqui aparecem os programas conectados agora e quantas conexões cada um tem: muitas conexões costumam indicar downloads.</p>
+      <p class="faint" style="margin:-4px 0 10px">${LINUX ? "O sistema só mostra quanto cada programa baixa com permissão de administrador." : "O Windows só mostra quanto cada programa baixa com permissão de administrador."} Aqui aparecem os programas conectados agora e quantas conexões cada um tem: muitas conexões costumam indicar downloads.</p>
       ${!p ? loading("Lendo as conexões...") : p.programs.length ? p.programs.slice(0, 40).map(progRow).join("") : `<p class="faint">Nenhum programa conectado.</p>`}</div>`;
 }
 const KIND_ICON = { torrent: "download", cloud: "cloud", games: "gamepad-2", update: "refresh-cw", stream: "tv", browser: "globe", vpn: "shield" };
@@ -300,7 +302,7 @@ function drawLive() {
 // ---------------------------------------------------------------- aparelhos
 function devices() {
   const d = S.devs;
-  const head = `<div class="row"><div class="grow"><h1 class="t">Aparelhos na rede</h1><p class="sub">Celulares, PCs, TVs e outros aparelhos que o Windows viu na sua rede.</p></div>
+  const head = `<div class="row"><div class="grow"><h1 class="t">Aparelhos na rede</h1><p class="sub">Celulares, PCs, TVs e outros aparelhos que ${LINUX ? "o PC" : "o Windows"} viu na sua rede.</p></div>
     <button class="btn" data-act="sweep" ${S.sweeping ? "disabled" : ""}>${S.sweeping ? `<span class="spin"></span>Procurando...` : `<i class="i i-radar"></i>Procurar aparelhos`}</button></div>`;
   if (!d) return head + loading("Lendo a rede...");
   const self = d.self ? `<div class="dev"><div class="ic"><i class="i i-monitor"></i></div><div><b>Este PC</b> <span class="badge me">você</span><div class="meta" data-noi18n>${esc(d.self.ip)} · ${esc(d.self.mac)}</div></div><span class="faint" data-noi18n>${esc(d.self.name)}</span></div>` : "";
@@ -342,13 +344,13 @@ function tests() {
     <p class="faint" style="margin:0 0 8px">O DNS transforma o nome dos sites em endereços. Um DNS lento faz os sites demorarem para começar a abrir.</p>
     ${S.dns ? `<table class="table"><thead><tr><th>Servidor</th><th></th><th class="num">Tempo</th></tr></thead><tbody>${S.dns.map((x) => `<tr><td data-noi18n>${esc(x.ip)}</td>
       <td>${x.own ? `<span class="badge me">o seu</span>` : esc(x.name)}${best && x === best ? ` <span class="badge ok">mais rápido</span>` : ""}</td><td class="num">${x.ms == null ? "não respondeu" : `${x.ms} ms`}</td></tr>`).join("")}</tbody></table>
-      <p class="faint">Para trocar o DNS: Configurações do Windows > Rede e Internet > sua conexão > Atribuição de servidor DNS > Editar.</p>` : ""}</div>`;
+      <p class="faint">${LINUX ? "Para trocar o DNS: Configurações > Rede (ou Wi-Fi) > engrenagem da conexão > IPv4 > DNS (desligue o Automático)." : "Para trocar o DNS: Configurações do Windows > Rede e Internet > sua conexão > Atribuição de servidor DNS > Editar."}</p>` : ""}</div>`;
   const tools = `<div class="card"><h3 class="h"><i class="i i-settings"></i>Ferramentas</h3><div class="tools">
       <button class="tool" data-act="flush"><i class="i i-trash-2"></i><b>Limpar o cache de DNS</b><span>Resolve sites que não abrem depois de mudarem de endereço.</span></button>
       <button class="tool" data-act="renew"><i class="i i-refresh-cw"></i><b>Renovar o IP</b><span>Pede um endereço novo ao roteador. A internet cai por alguns segundos.</span></button>
-      <button class="tool" data-act="settings:network"><i class="i i-network"></i><b>Configurações de rede</b><span>Abre Rede e Internet nas configurações do Windows.</span></button>
-      <button class="tool" data-act="settings:adapters"><i class="i i-ethernet-port"></i><b>Placas de rede</b><span>Lista clássica de conexões do Windows.</span></button>
-      <button class="tool" data-act="settings:reset"><i class="i i-rotate-ccw"></i><b>Redefinir a rede</b><span>Abre as configurações avançadas, onde fica "Redefinição de rede" (último recurso).</span></button>
+      <button class="tool" data-act="settings:network"><i class="i i-network"></i><b>Configurações de rede</b><span>${LINUX ? "Abre Rede nas configurações do sistema." : "Abre Rede e Internet nas configurações do Windows."}</span></button>
+      <button class="tool" data-act="settings:adapters"><i class="i i-ethernet-port"></i><b>Placas de rede</b><span>${LINUX ? "Editor de conexões do NetworkManager." : "Lista clássica de conexões do Windows."}</span></button>
+      <button class="tool" data-act="settings:reset"><i class="i i-rotate-ccw"></i><b>Redefinir a rede</b><span>${LINUX ? "Abre as configurações de rede, onde dá para apagar e refazer a conexão (último recurso)." : `Abre as configurações avançadas, onde fica "Redefinição de rede" (último recurso).`}</span></button>
     </div></div>`;
   return `<div><h1 class="t">Testes</h1><p class="sub">Velocidade, ping, DNS e ferramentas para resolver problemas comuns.</p></div>${speedCard}<div class="grid2">${latCard}${dnsCard}</div>${tools}`;
 }

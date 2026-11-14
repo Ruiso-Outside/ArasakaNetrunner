@@ -5,6 +5,9 @@ const { execFile, spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const wifi = require("./wifi");
+// Linux: motor em JS no lugar do engine.ps1 (mesmos pedidos e campos)
+const IS_WIN = process.platform === "win32";
+const LX = IS_WIN ? null : require("./engine-linux");
 
 const SYS = process.env.SystemRoot || "C:\\Windows";
 const exe = (name) => path.join(SYS, "System32", name);
@@ -72,6 +75,7 @@ exports.activate = (ctx) => {
     return p;
   }
   function ask(cmd, a = {}, timeout = 30000) {
+    if (LX) return Promise.race([LX.ask(cmd, a), sleep(timeout).then(() => { throw new Error("O motor da rede não respondeu"); })]);
     const p = engine(), id = ++seq;
     return new Promise((resolve, reject) => {
       const t = setTimeout(() => { waiting.delete(id); reject(new Error("O motor da rede não respondeu")); }, timeout);
@@ -120,7 +124,7 @@ exports.activate = (ctx) => {
     const conn = ov.wifi ? { Bssid: ov.wifi.bssid } : null;
     const a = wifi.analyze(arr(r.networks), conn);
     // sem a Localização do Windows ligada, o Windows não deixa listar as redes (Windows 11 24H2+)
-    lastScan = { at: Date.now(), error: r.error || 0, blocked: r.error === 5 || (ov.hasWifiCard && !arr(r.networks).length && !!ov.wifi), ...a };
+    lastScan = { at: Date.now(), error: r.error || 0, blocked: IS_WIN && r.error === 5 || IS_WIN && (ov.hasWifiCard && !arr(r.networks).length && !!ov.wifi), ...a };
     return lastScan;
   }
   ctx.handle("scan", (opts) => scan(opts || {}));
@@ -205,7 +209,8 @@ exports.activate = (ctx) => {
       const found = ssdp().catch(() => ({}));
       // pinga a rede local (no máximo 254 endereços, os do mesmo /24 do PC) para os aparelhos aparecerem na tabela do Windows
       const base = me.ip.split(".").slice(0, 3).join(".");
-      await psJson(`$p = 1..254 | ForEach-Object { [Net.NetworkInformation.Ping]::new().SendPingAsync('${base}.' + $_, 600) }; try { [Threading.Tasks.Task]::WaitAll($p, 4000) | Out-Null } catch {}; @{ ok = $true }`, 30000).catch(() => {});
+      if (LX) await LX.sweep(base).catch(() => {});
+      else await psJson(`$p = 1..254 | ForEach-Object { [Net.NetworkInformation.Ping]::new().SendPingAsync('${base}.' + $_, 600) }; try { [Threading.Tasks.Task]::WaitAll($p, 4000) | Out-Null } catch {}; @{ ok = $true }`, 30000).catch(() => {});
       upnp = { ...upnp, ...(await found) }; // guarda: na próxima abertura os nomes já aparecem
       prefs.upnp = upnp; savePrefs();
     }
@@ -221,7 +226,7 @@ exports.activate = (ctx) => {
       const u = upnp[ip] || null;
       return { ip, mac: x.mac, name: (names && names[ip]) || (u && u.name) || "", label: prevNames[x.mac] || "", upnp: u, router: ip === m.gateway, random: (first & 2) === 2, online: x.state === "Reachable" || x.state === "Delay" || x.state === "Probe" };
     }).sort((a, b) => b.router - a.router || a.ip.split(".").map(Number).reduce((s, v) => s * 256 + v, 0) - b.ip.split(".").map(Number).reduce((s, v) => s * 256 + v, 0));
-    return { list, self: { ip: me.ip, mac: m.mac, name: process.env.COMPUTERNAME || "" } };
+    return { list, self: { ip: me.ip, mac: m.mac, name: process.env.COMPUTERNAME || require("os").hostname() || "" } };
   }
   ctx.handle("devices", (o) => devices(o || {}));
   ctx.handle("device-label", ({ mac, label }) => { prefs.deviceNames = { ...(prefs.deviceNames || {}), [mac]: String(label || "").slice(0, 40) }; if (!label) delete prefs.deviceNames[mac]; savePrefs(); return true; });
@@ -237,7 +242,7 @@ exports.activate = (ctx) => {
   async function latency({ rounds = 20 } = {}) {
     const ov = lastOverview || await overview();
     const targets = [...(ov.main && ov.main.gateway ? [["gateway", ov.main.gateway]] : []), ["cloudflare", "1.1.1.1"], ["google", "8.8.8.8"]];
-    const r = await psJson(`$t = @(${targets.map(([, ip]) => `'${ip}'`).join(",")}); $res = @{}; foreach ($x in $t) { $res[$x] = @() }
+    const r = LX ? await LX.latency(targets.map(([, ip]) => ip), Math.max(5, Math.min(60, rounds))) : await psJson(`$t = @(${targets.map(([, ip]) => `'${ip}'`).join(",")}); $res = @{}; foreach ($x in $t) { $res[$x] = @() }
       for ($i = 0; $i -lt ${Math.max(5, Math.min(60, rounds))}; $i++) {
         $tasks = @{}; foreach ($x in $t) { $tasks[$x] = [Net.NetworkInformation.Ping]::new().SendPingAsync($x, 1000) }
         foreach ($x in $t) { try { $p = $tasks[$x].GetAwaiter().GetResult(); $res[$x] += $(if ($p.Status -eq 'Success') { [int]$p.RoundtripTime } else { -1 }) } catch { $res[$x] += -1 } }
@@ -252,7 +257,7 @@ exports.activate = (ctx) => {
     const mine = (ov.main ? ov.main.dns : []).filter((x) => /^\d+\.\d+\.\d+\.\d+$/.test(x)).slice(0, 2);
     const servers = [...mine.map((ip) => ({ ip, name: "", own: true })), { ip: "1.1.1.1", name: "Cloudflare" }, { ip: "8.8.8.8", name: "Google" }, { ip: "9.9.9.9", name: "Quad9" }]
       .filter((s, i, a) => a.findIndex((x) => x.ip === s.ip) === i);
-    const r = await psJson(`$names = 'www.google.com','www.wikipedia.org','www.microsoft.com','www.youtube.com'; $out = @{}
+    const r = LX ? await LX.dnsBench(servers.map((s) => s.ip), ["www.google.com", "www.wikipedia.org", "www.microsoft.com", "www.youtube.com"]) : await psJson(`$names = 'www.google.com','www.wikipedia.org','www.microsoft.com','www.youtube.com'; $out = @{}
       foreach ($s in @(${servers.map((s) => `'${s.ip}'`).join(",")})) { $ms = @(); foreach ($n in $names) { $w = [Diagnostics.Stopwatch]::StartNew(); try { Resolve-DnsName -Name $n -Server $s -Type A -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Out-Null; $ms += [int]$w.ElapsedMilliseconds } catch { $ms += -1 } }; $out[$s] = $ms }
       $out`, 60000);
     return servers.map((s) => { const ms = arr(r && r[s.ip]).map(Number).filter((x) => x >= 0).sort((a, b) => a - b); return { ...s, ms: ms.length ? ms[Math.floor(ms.length / 2)] : null, fails: 4 - ms.length }; });
@@ -314,9 +319,16 @@ exports.activate = (ctx) => {
   ctx.handle("speed-history", () => prefs.speedHistory || []);
 
   // ---------------------------------------------------------------- ferramentas (com confirmação na tela)
-  ctx.handle("flush-dns", async () => { const r = await run(exe("ipconfig.exe"), ["/flushdns"]); if (r.code) throw new Error("Não foi possível limpar o cache de DNS"); return true; });
+  ctx.handle("flush-dns", async () => {
+    if (LX) { if (!(await LX.flushDns())) throw new Error("Não foi possível limpar o cache de DNS (o sistema pode pedir a senha)"); return true; }
+    const r = await run(exe("ipconfig.exe"), ["/flushdns"]); if (r.code) throw new Error("Não foi possível limpar o cache de DNS"); return true; });
   ctx.handle("renew-ip", async () => {
     const ov = lastOverview || await overview();
+    if (LX) {
+      if (!ov.main || !(await LX.renewIp(ov.main.name))) throw new Error("O NetworkManager não reconectou a rede");
+      lastOverview = null;
+      return true;
+    }
     const r = await run(exe("ipconfig.exe"), ["/renew", ...(ov.main ? [ov.main.name] : [])], { timeout: 90000 });
     if (r.code) throw new Error("O Windows não renovou o IP (pode precisar de permissão de administrador)");
     lastOverview = null;
@@ -325,6 +337,7 @@ exports.activate = (ctx) => {
   const SETTINGS = { network: "ms-settings:network", wifi: "ms-settings:network-wifi", location: "ms-settings:privacy-location", update: "ms-settings:delivery-optimization", adapters: "ncpa.cpl", reset: "ms-settings:network-advancedsettings" };
   ctx.handle("open-settings", (what) => {
     const t = SETTINGS[what]; if (!t) throw new Error("Configuração desconhecida");
+    if (LX) return LX.openSettings(what);
     if (t.endsWith(".cpl")) execFile(exe("control.exe"), [t], { windowsHide: false });
     else execFile(path.join(SYS, "explorer.exe"), [t], { windowsHide: false });
     return true;
@@ -394,7 +407,7 @@ exports.activate = (ctx) => {
       const own = dns.filter((d) => d.own && d.ms != null), pub = dns.filter((d) => !d.own && d.ms != null).sort((a, b) => a.ms - b.ms)[0];
       if (own.length && pub) {
         const o = Math.min(...own.map((d) => d.ms));
-        if (o > 120 && pub.ms < o * 0.6) add("baixo", "dns", `O DNS da sua conexão está lento (${o} ms)`, `É ele que transforma nomes de sites em endereços. O ${pub.name} respondeu em ${pub.ms} ms; trocar o DNS nas configurações do Windows deixa os sites abrirem mais rápido.`, "network");
+        if (o > 120 && pub.ms < o * 0.6) add("baixo", "dns", `O DNS da sua conexão está lento (${o} ms)`, `É ele que transforma nomes de sites em endereços. O ${pub.name} respondeu em ${pub.ms} ms; trocar o DNS nas configurações ${IS_WIN ? "do Windows" : "de rede"} deixa os sites abrirem mais rápido.`, "network");
       }
       // quem está usando a rede
       if (pr.update && pr.update.jobs) add("médio", "update", pr.update.jobs === 1 ? "O Windows Update está baixando 1 arquivo" : `O Windows Update está baixando ${pr.update.jobs} arquivos`, "Downloads de atualizações usam a internet em segundo plano. Espere terminar ou pause as atualizações por um tempo nas configurações do Windows.", "update");
