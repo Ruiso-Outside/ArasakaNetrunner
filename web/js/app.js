@@ -90,7 +90,7 @@ const qualityOf = (rssi) => Math.max(0, Math.min(100, 2 * (rssi + 100)));
 // ---------------------------------------------------------------- visão geral
 function verdict(s) {
   if (s >= 85) return ["Sua rede está ótima", "Não encontramos nada sério atrapalhando a conexão.", "#22c55e"];
-  if (s >= 65) return ["Sua rede está bem", "Algumas coisas podem estar tirando um pouco de velocidade. Veja abaixo.", "#14b8a6"];
+  if (s >= 65) return ["Sua rede está bem", "Algumas coisas podem estar tirando um pouco de velocidade. Veja abaixo.", "#ff0000"];
   if (s >= 45) return ["Tem coisas atrapalhando a rede", "Encontramos o que pode estar deixando a conexão lenta. Veja o que fazer abaixo.", "#fb923c"];
   return ["A rede está com problemas", "Encontramos problemas sérios na conexão. Comece pelos primeiros da lista.", "#f87171"];
 }
@@ -104,7 +104,7 @@ function home() {
   const ov = S.ov;
   if (!ov) return loading("Lendo a conexão...");
   const d = S.diag, w = ov.wifi, m = ov.main;
-  let title, text, color = "#14b8a6";
+  let title, text, color = "#ff0000";
   if (!m) [title, text] = ["Sem conexão", "Nenhuma placa de rede está conectada. Confira o cabo ou conecte-se a uma rede Wi-Fi."];
   else if (d) [title, text, color] = verdict(d.score);
   else [title, text] = [w ? `Conectado ao Wi-Fi ${w.ssid || ""}`.trim() : "Conectado por cabo", "Clique em Diagnosticar para ver se algo está deixando a rede lenta: sinal, canal, ping, DNS e programas baixando."];
@@ -195,7 +195,7 @@ function wifiTab() {
   const spec = b ? `<div class="card"><div class="row" style="margin-bottom:10px"><h3 class="h grow" style="margin:0"><i class="i i-waves"></i>Frequências</h3>
       <div class="seg-tabs">${bandsAvail.map((k) => `<button class="${k === S.scanBand ? "on" : ""}" data-band="${k}">${bandName(k)}</button>`).join("")}</div></div>
       <canvas class="chart spectrum" id="spectrum"></canvas>
-      <div class="legend" style="margin-top:8px"><span><i class="sw" style="background:#14b8a6"></i>Sua rede</span><span><i class="sw" style="background:#64748b"></i>Redes vizinhas</span>
+      <div class="legend" style="margin-top:8px"><span><i class="sw" style="background:#ff0000"></i>Sua rede</span><span><i class="sw" style="background:#64748b"></i>Redes vizinhas</span>
         <span class="faint">Cada curva é uma rede: a largura é o pedaço da frequência que ela ocupa, a altura é a força do sinal aqui.</span></div>
       <h3 class="h" style="margin-top:18px"><i class="i i-chart-column"></i>Canais: quanto cada um está ocupado</h3>
       ${channelBars(b)}</div>` : "";

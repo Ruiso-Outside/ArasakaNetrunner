@@ -1,12 +1,12 @@
 {
   "id": "rede",
-  "name": "Piphin Rede",
+  "name": "Arasaka Netrunner",
   "version": "0.0.0",
   "description": "Vê tudo da sua rede: sinal e frequências do Wi-Fi, canais, uso ao vivo, aparelhos conectados e testes de ping, DNS e velocidade. Explica o que está deixando a internet lenta.",
   "main": "backend.js",
   "ui": "web/index.html",
   "icon": "icons/rede.png",
-  "accent": "#14b8a6",
+  "accent": "#ff0000",
   "minHub": "1.4.0",
   "tools": [
     {
