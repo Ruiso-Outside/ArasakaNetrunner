@@ -9,7 +9,7 @@ const { execFile } = require("child_process");
 
 function run(file, args, { timeout = 20000 } = {}) {
   return new Promise((resolve) => {
-    execFile(file, args, { timeout, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, LC_ALL: "C" } }, (err, out, errOut) =>
+    execFile(file, args, { timeout, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, LC_ALL: "C.UTF-8" } }, (err, out, errOut) =>
       resolve({ code: err ? (typeof err.code === "number" ? err.code : 1) : 0, out: String(out || ""), err: String(errOut || "") }));
   });
 }
